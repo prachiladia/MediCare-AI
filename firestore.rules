@@ -1,0 +1,115 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ---------------------------------------------------------------
+    // Helper functions
+    // ---------------------------------------------------------------
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Every document in this app carries a userId field that must
+    // match the authenticated caller. This is the core rule that
+    // guarantees one user can never read or write another user's data.
+    function isOwnerOfResource() {
+      return isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
+    function isOwnerOfIncoming() {
+      return isSignedIn() && request.resource.data.userId == request.auth.uid;
+    }
+
+    // ---------------------------------------------------------------
+    // users/{userId}
+    // The document ID itself IS the user's uid, so ownership is
+    // simply "the path id equals my uid".
+    // ---------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId)
+                    && request.resource.data.uid == userId
+                    && request.resource.data.email is string;
+      allow update: if isOwner(userId)
+                    && request.resource.data.uid == resource.data.uid; // uid immutable
+      allow delete: if isOwner(userId);
+    }
+
+    // ---------------------------------------------------------------
+    // medicines/{medicineId}
+    // ---------------------------------------------------------------
+    match /medicines/{medicineId} {
+      allow read: if isOwnerOfResource();
+      allow create: if isOwnerOfIncoming()
+                    && request.resource.data.name is string
+                    && request.resource.data.name.size() > 0
+                    && request.resource.data.dosage is number
+                    && request.resource.data.dosage > 0;
+      allow update: if isOwnerOfResource()
+                    && isOwnerOfIncoming()
+                    // userId can never be changed on update
+                    && request.resource.data.userId == resource.data.userId;
+      allow delete: if isOwnerOfResource();
+    }
+
+    // ---------------------------------------------------------------
+    // medicineHistory/{historyId}
+    // History records are written by Cloud Functions (admin SDK,
+    // bypasses rules) for scheduled reminders, but the client also
+    // writes directly when a user taps "Taken / Missed / Skipped".
+    // History is immutable once written (no update/delete from client)
+    // to preserve an honest audit trail.
+    // ---------------------------------------------------------------
+    match /medicineHistory/{historyId} {
+      allow read: if isOwnerOfResource();
+      allow create: if isOwnerOfIncoming()
+                    && request.resource.data.medicineId is string
+                    && request.resource.data.status in ['taken', 'missed', 'skipped', 'pending'];
+      allow update: if false;
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // notifications/{notificationId}
+    // Written only by Cloud Functions (admin SDK). Client can read
+    // its own notifications and mark them as read, nothing else.
+    // ---------------------------------------------------------------
+    match /notifications/{notificationId} {
+      allow read: if isOwnerOfResource();
+      allow update: if isOwnerOfResource()
+                    && isOwnerOfIncoming()
+                    // clients may only flip "read", nothing else
+                    && request.resource.data.diff(resource.data).affectedKeys()
+                         .hasOnly(['read', 'readAt']);
+      allow create: if false;
+      allow delete: if false;
+    }
+
+    // ---------------------------------------------------------------
+    // aiChats/{chatId}
+    // AI responses are generated server-side (Cloud Function) so the
+    // client should not be able to fabricate an "assistant" message.
+    // Client may create the user's own question document; the
+    // function then attaches the AI response server-side.
+    // ---------------------------------------------------------------
+    match /aiChats/{chatId} {
+      allow read: if isOwnerOfResource();
+      allow create: if isOwnerOfIncoming()
+                    && request.resource.data.question is string
+                    && request.resource.data.question.size() > 0
+                    && request.resource.data.question.size() < 2000;
+      allow update: if false; // only Cloud Functions (admin SDK) may attach the answer
+      allow delete: if isOwnerOfResource();
+    }
+
+    // Deny everything else by default.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
