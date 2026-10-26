@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1021766941205",
+    "project_id": "ai-medicine-reminder-910be",
+    "storage_bucket": "ai-medicine-reminder-910be.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1021766941205:android:bc7818bf70661b6f932c1c",
+        "android_client_info": {
+          "package_name": "com.example.mobile"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1021766941205-cl7o8pbmfje0hnmeod8fvsj56695m6h5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBvqqJB-MqpvwKRZKUCofY7r-WVJo4LGmU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1021766941205-cl7o8pbmfje0hnmeod8fvsj56695m6h5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
